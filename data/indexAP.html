@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Füllstand-Anzeige – WLAN einrichten</title>
+    <link rel="stylesheet" type="text/css" href="WifiManager.css">
+</head>
+<!-- Startseite im AP-Modus (Captive-Portal): ausschließlich WLAN-Konfiguration.
+     Projektseiten (/fill) und Firmware-Update (/update) gibt es nur im Heim-WLAN (indexSTA.html). -->
+<body>
+    <div class="app">
+        <div class="header">
+            <div class="title">
+                <div class="logo" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" class="wifi-icon" aria-hidden="true">
+                        <path d="M12 18.5c.7 0 1.25.55 1.25 1.25S12.7 21 12 21s-1.25-.55-1.25-1.25S11.3 18.5 12 18.5z" />
+                        <path d="M8.5 16a6 6 0 0 1 7 0" />
+                        <path d="M6 13a9 9 0 0 1 12 0" />
+                        <path d="M3.5 10a12 12 0 0 1 17 0" />
+                    </svg>
+                </div>
+                <div>
+                    <h1>WLAN einrichten</h1>
+                    <div class="hint" style="margin:0">Füllstand-Anzeige · Einrichtungsmodus</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <section class="sec">
+                <h2>1. Heim-WLAN wählen</h2>
+                <div class="toolbar">
+                    <input id="filter" class="input" type="search" placeholder="SSID filtern…" inputmode="search" />
+                    <button id="btn-scan" class="btn" type="button">Erneut scannen</button>
+                </div>
+                <div id="status" class="hint" style="margin-top:8px">Wird gescannt…</div>
+                <ul id="list" class="list" aria-live="polite"></ul>
+                <div id="empty" class="hint" style="display:none">Keine Netzwerke gefunden. Bitte erneut scannen oder die SSID unten von Hand eintragen.</div>
+            </section>
+
+            <section class="sec">
+                <h2>2. Zugangsdaten</h2>
+                <form id="form" method="POST" action="/save" autocomplete="off">
+                    <div class="row">
+                        <label for="ssid">SSID</label><input id="ssid" class="input grow" name="ssid" required maxlength="32" placeholder="Netzwerkname" /></div>
+                    <div class="row">
+                        <label for="password">Passwort</label><input id="password" class="input grow" name="password" type="password" required minlength="8" maxlength="64" placeholder="WLAN-Passwort" /></div>
+                    <div class="row">
+                        <label></label>
+                        <label class="switch"><input id="show" type="checkbox" /> Passwort anzeigen</label></div>
+
+                    <details class="accordion">
+                        <summary><span>Erweitert: IP-Adresse, Hostname, Zeitserver</span><span class="chev">▶</span></summary>
+                        <div class="acc">
+                            <div class="row">
+                                <label>Adresse</label>
+                                <label class="switch"><input type="radio" name="ap-dhcp" value="true" checked /> automatisch (DHCP)</label>
+                                <label class="switch"><input type="radio" name="ap-dhcp" value="false" /> statisch</label>
+                            </div>
+                            <div id="static" style="display:none">
+                                <div class="row"><label for="ip">IP-Adresse</label><input id="ip" class="input grow" name="ip" placeholder="192.168.1.100" disabled /></div>
+                                <div class="row"><label for="gw">Gateway</label><input id="gw" class="input grow" name="gw" placeholder="192.168.1.1" disabled /></div>
+                                <div class="row"><label for="sn">Subnetz</label><input id="sn" class="input grow" name="sn" placeholder="255.255.255.0" disabled /></div>
+                                <div class="row"><label for="dns1">DNS 1</label><input id="dns1" class="input grow" name="dns1" placeholder="192.168.1.1" disabled /></div>
+                                <div class="row"><label for="dns2">DNS 2</label><input id="dns2" class="input grow" name="dns2" placeholder="optional" disabled /></div>
+                            </div>
+                            <div class="row"><label for="hostname">Hostname</label><input id="hostname" class="input grow" name="hostname" placeholder="fuellstand-anzeige" /></div>
+                            <div class="row"><label for="ntp1">NTP 1</label><input id="ntp1" class="input grow" name="ntp1" placeholder="pool.ntp.org" /></div>
+                            <div class="row"><label for="ntp2">NTP 2</label><input id="ntp2" class="input grow" name="ntp2" placeholder="optional" /></div>
+                        </div>
+                    </details>
+
+                    <div class="footer">
+                        <button id="btn-save" class="btn primary" type="submit">3. Speichern und verbinden</button></div>
+                </form>
+                <p class="hint" id="after">Nach dem Speichern startet das Gerät neu und verbindet sich mit dem Heim-WLAN.
+                    Dieses Einrichtungs-WLAN verschwindet dann. Weiter geht es im Heim-WLAN unter
+                    <code id="target">http://fuellstand-anzeige.local/</code>.</p>
+            </section>
+        </div>
+
+        <footer class="copyright">© 2026 R.Wisser · Füllstand-Anzeige</footer>
+    </div>
+
+    <script>
+        (function () {
+            const $ = (id) => document.getElementById(id);
+            const els = { list: $("list"), empty: $("empty"), status: $("status"), filter: $("filter"), btnScan: $("btn-scan"),
+                          ssid: $("ssid"), pass: $("password"), show: $("show"), form: $("form"), btnSave: $("btn-save"),
+                          host: $("hostname"), target: $("target"), stat: $("static") };
+
+            // ----- Netzwerkliste -----
+            const level = (r) => r >= -50 ? 4 : r >= -60 ? 3 : r >= -70 ? 2 : r >= -80 ? 1 : 0;
+            const bars = (r) => {
+                const w = document.createElement("span"); w.className = "bars";
+                for (let i = 0; i < 5; i++) { const b = document.createElement("span"); b.style.height = 5 + i * 2 + "px"; if (i <= level(r)) b.className = "on"; w.appendChild(b); }
+                return w;
+            };
+            const quality = (r) => {
+                let t = "Schlecht", c = "bad";
+                if (r >= -60) { t = "Gut"; c = "good"; } else if (r >= -67) { t = "Mittel"; c = "mid"; } else if (r >= -75) { t = "Schwach"; c = "weak"; }
+                const s = document.createElement("span"); s.className = "qual " + c; s.textContent = t; return s;
+            };
+            const dedupe = (l) => { const m = new Map(); for (const n of l) { if (!n || !n.ssid) continue; const c = m.get(n.ssid); if (!c || n.rssi > c.rssi) m.set(n.ssid, n); } return [...m.values()]; };
+
+            let last = [];
+            const render = () => {
+                const q = (els.filter.value || "").toLowerCase().trim();
+                let arr = dedupe(last).sort((a, b) => b.rssi - a.rssi);
+                if (q) arr = arr.filter((n) => n.ssid.toLowerCase().includes(q));
+                els.list.textContent = "";
+                els.empty.style.display = arr.length ? "none" : "block";
+                for (const n of arr) {
+                    const li = document.createElement("li"); li.className = "item"; li.dataset.ssid = n.ssid;
+                    if (n.ssid === els.ssid.value) li.classList.add("selected");
+                    const lock = document.createElement("span"); lock.className = "lock"; lock.textContent = n.secure ? "🔒" : "🔓";
+                    const name = document.createElement("div");
+                    const s = document.createElement("div"); s.className = "ssid"; s.textContent = n.ssid;      // textContent: SSIDs sind fremde Eingaben
+                    const m = document.createElement("div"); m.className = "meta"; m.textContent = n.rssi + " dBm";
+                    name.append(s, m);
+                    const right = document.createElement("div"); right.className = "sigwrap"; right.append(quality(n.rssi), bars(n.rssi));
+                    li.append(lock, name, right); els.list.appendChild(li);
+                }
+            };
+
+            const scan = async () => {
+                els.btnScan.disabled = true; els.status.textContent = "Wird gescannt…";
+                try {
+                    const start = await fetch("/scan", { cache: "no-store" });
+                    if (!start.ok && start.status !== 202) throw new Error("HTTP " + start.status);
+                    let data = null;
+                    if (start.status === 202) {
+                        for (let i = 0; i < 60 && data === null; i++) {      // max. 15 s (Server-Timeout 10 s)
+                            const r = await fetch("/scan/result", { cache: "no-store" });
+                            if (r.status === 202) { await new Promise((res) => setTimeout(res, 250)); continue; }
+                            if (!r.ok) throw new Error("HTTP " + r.status);
+                            const j = await r.json(); data = Array.isArray(j) ? j : [];
+                        }
+                        if (data === null) throw new Error("Scan-Timeout");
+                    } else {
+                        const j = await start.json(); data = Array.isArray(j) ? j : [];
+                    }
+                    last = data; render();
+                    els.status.textContent = dedupe(last).length + " Netzwerke gefunden – zum Auswählen antippen.";
+                } catch (e) {
+                    console.error(e); els.status.textContent = "Fehler beim Scannen. Bitte erneut versuchen.";
+                } finally { els.btnScan.disabled = false; }
+            };
+
+            els.btnScan.addEventListener("click", scan);
+            els.filter.addEventListener("input", render);
+            els.list.addEventListener("click", (ev) => {
+                const li = ev.target.closest(".item"); if (!li) return;
+                els.ssid.value = li.dataset.ssid || ""; els.ssid.dispatchEvent(new Event("input"));
+                render(); els.pass.focus();
+            });
+
+            // ----- Formular -----
+            els.show.addEventListener("change", () => { els.pass.type = els.show.checked ? "text" : "password"; });
+            const setStatic = () => {
+                const st = document.querySelector('input[name="ap-dhcp"]:checked').value === "false";
+                els.stat.style.display = st ? "block" : "none";
+                els.stat.querySelectorAll("input").forEach((i) => { i.disabled = !st; i.required = st && ["ip", "gw", "sn"].includes(i.id); });
+            };
+            document.querySelectorAll('input[name="ap-dhcp"]').forEach((r) => r.addEventListener("change", setStatic));
+            const showTarget = () => { els.target.textContent = "http://" + (els.host.value.trim() || els.host.placeholder) + ".local/"; };
+            els.host.addEventListener("input", showTarget);
+            els.form.addEventListener("submit", () => { els.btnSave.disabled = true; els.btnSave.textContent = "Wird gespeichert…"; });
+
+            // Gespeicherte Werte übernehmen (Passwort wird nie ausgeliefert: leer = unverändert, solange die SSID gleich bleibt)
+            (async () => {
+                try {
+                    const r = await fetch("/api/ap/config", { cache: "no-store" });
+                    if (!r.ok) return;
+                    const c = await r.json(); if (!c) return;
+                    if (c.ssid) els.ssid.value = c.ssid;
+                    if (c.hasPassword) {
+                        const saved = c.ssid || "";
+                        const upd = () => {
+                            const same = els.ssid.value === saved;
+                            els.pass.required = !same;
+                            els.pass.placeholder = same ? "unverändert (gespeichert)" : "WLAN-Passwort";
+                        };
+                        els.ssid.addEventListener("input", upd); upd();
+                    }
+                    if (c.dhcp === false) { document.querySelector('input[name="ap-dhcp"][value="false"]').checked = true; setStatic(); }
+                    for (const k of ["ip", "gw", "sn", "dns1", "dns2", "hostname", "ntp1", "ntp2"]) if (c[k]) $(k).value = c[k];
+                    showTarget(); render();
+                } catch (e) { }
+            })();
+
+            scan();
+        })();
+    </script>
+</body>
+</html>

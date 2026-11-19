@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>Füllstand-Anzeige</title>
+    <link rel="stylesheet" type="text/css" href="WifiManager.css">
+    <style>
+        .links{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+        .links .btn{text-decoration:none}
+    </style>
+</head>
+<!-- Startseite im Heim-WLAN (STA): Geräteseite, Netzwerkeinstellungen, Firmware-Update -->
+<body>
+    <div class="app">
+        <div class="header">
+            <div class="title">
+                <div class="logo" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" class="wifi-icon" aria-hidden="true"><path d="M12 3c3 4 6 7.5 6 11a6 6 0 0 1-12 0c0-3.5 3-7 6-11z"/></svg>
+                </div>
+                <div>
+                    <h1>Füllstand-Anzeige</h1>
+                    <div class="hint" style="margin:0" id="host">–</div>
+                </div>
+            </div>
+            <div class="actions">
+                <a class="gear" href="/settings" title="Netzwerk-Einstellungen" aria-label="Netzwerk-Einstellungen">⚙️</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <section class="sec">
+                <h2>Füllstand</h2>
+                <p class="hint">Füllstände aller Behälter, Kalibrierung, Sender koppeln und MQTT/Home Assistant.</p>
+                <div class="links">
+                    <a class="btn primary" href="/fill">Füllstand öffnen</a>
+                </div>
+            </section>
+
+            <section class="sec">
+                <h2>Gerät</h2>
+                <div class="links">
+                    <a class="btn" href="/settings">Netzwerk-Einstellungen</a>
+                    <a class="btn" href="/update">Firmware-Update</a>
+                </div>
+            </section>
+
+            <section class="sec">
+                <h2>Status</h2>
+                <div class="hint">WLAN: <code id="ssid">–</code> <span id="rssi"></span></div>
+                <div class="hint">Adresse: <code id="addr">–</code></div>
+                <div class="hint">Hostname: <code id="hname">–</code></div>
+            </section>
+        </div>
+
+        <footer class="copyright">© 2026 R.Wisser · Füllstand-Anzeige</footer>
+    </div>
+
+    <script>
+        (function () {
+            const $ = (id) => document.getElementById(id);
+            $("host").textContent = location.hostname || "";
+            $("addr").textContent = "http://" + (location.host || "") + "/";
+            (async () => {
+                try {
+                    const r = await fetch("/api/sta/config", { cache: "no-store" });
+                    if (!r.ok) return;
+                    const c = await r.json();
+                    if (c.ssid) $("ssid").textContent = c.ssid;
+                    if (typeof c.rssi === "number") $("rssi").textContent = "(" + c.rssi + " dBm)";
+                    if (c.hostname) { $("hname").textContent = c.hostname + ".local"; $("host").textContent = c.hostname + ".local"; }
+                } catch (e) { }
+            })();
+        })();
+    </script>
+</body>
+</html>
