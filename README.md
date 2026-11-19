@@ -65,3 +65,6 @@ Wie Basisprojekt (ElegantOTA, ESPAsyncWebServer, AsyncTCP, ArduinoJson) **plus**
 - `src/FillLevelProtocol.h` – Datenpaket (**identisch im Sender halten!**)
 - `src/ReceiverPage.h` – Seite `/fill`
 - `src/ESPWiFiManager*` – aus ESP32_WiFiManager (ergänzt um `server()`-Zugriff für eigene Routen)
+
+## Lizenz
+MIT – siehe [LICENSE](LICENSE).

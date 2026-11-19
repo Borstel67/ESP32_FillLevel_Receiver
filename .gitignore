@@ -13,3 +13,6 @@ __vm/
 # Lokale Claude-/MCP-Konfiguration
 .claude/
 .mcp.json
+
+# graphify (lokaler Wissensgraph/Cache)
+graphify-out/
